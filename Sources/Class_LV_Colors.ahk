@@ -1,12 +1,13 @@
 ﻿; ======================================================================================================================
 ; Namespace:      LV_Colors
-; AHK version:    AHK 1.1.09.02
 ; Function:       Helper object and functions for ListView row and cell coloring
-; Language:       English
-; Tested on:      Win XPSP3, Win VistaSP2 (U32) / Win 7 (U64)
-; Version:        0.1.00.00/2012-10-27/just me
-;                 0.2.00.00/2013-01-12/just me - bugfixes and minor changes
-;                 0.3.00.00/2013-06-15/just me - added "Critical, 100" to avoid drawing issues
+; Testted with:   AHK 1.1.13.01 (A32/U32/U64)
+; Tested on:      Win 7 (x64)
+; Changelog:
+;     0.4.00.00/2013-12-30/just me - added static mode
+;     0.3.00.00/2013-06-15/just me - added "Critical, 100" to avoid drawing issues
+;     0.2.00.00/2013-01-12/just me - bugfixes and minor changes
+;     0.1.00.00/2012-10-27/just me - initial release
 ; ======================================================================================================================
 ; CLASS LV_Colors
 ;
@@ -64,6 +65,8 @@ Class LV_Colors {
       DrawStage := NumGet(L + NMHDRSize, 0, "UInt")
       , Row := NumGet(L + ItemSpecP, 0, "UPtr") + 1
       , Col := NumGet(L + SubItemP, 0, "Int") + 1
+      If This[H].IsStatic
+         Row := This.GetItemParam(H, Row)
       ; SubItemPrepaint ------------------------------------------------------------------------------------------------
       If (DrawStage = CDDS_SUBITEMPREPAINT) {
          NumPut(This[H].CurTX, L + ClrTxP, 0, "UInt"), NumPut(This[H].CurTB, L + ClrTxBkP, 0, "UInt")
@@ -99,6 +102,31 @@ Class LV_Colors {
       ; Others ---------------------------------------------------------------------------------------------------------
       Return CDRF_DODEFAULT
    }
+   ; -------------------------------------------------------------------------------------------------------------------
+   GetItemParam(HWND, Row) {
+      Static LVM_GETITEM := 0x1005 ; it's save to use LVM_GETITEMA
+      Static LVIF_PARAM := 0x00000004
+      Static LVITEMsize := 72 ; size of 64-bit structure, it doesn't matter in this case
+      Static OffParam := 24 + (A_PtrSize * 2) ; offset of the lParam member
+      VarSetCapacity(LVITEM, LVITEMsize, 0)
+      , NumPut(LVIF_PARAM, LVITEM, 0, "UInt")
+      , NumPut(Row - 1, LVITEM, 4, "Int")
+      SendMessage, % LVM_GETITEM, 0, % &LVITEM, , % "ahk_id " . HWND
+      Return NumGet(LVITEM, OffParam, "UPtr")
+   }
+   ; -------------------------------------------------------------------------------------------------------------------
+   SetItemParam(HWND, Row, Param) {
+      Static LVM_SETITEM := 0x1006 ; it's save to use LVM_SETITEMA
+      Static LVIF_PARAM := 0x00000004
+      Static LVITEMsize := 72 ; size of 64-bit structure, it doesn't matter in this case
+      Static OffParam := 24 + (A_PtrSize * 2) ; offset of the lParam member
+      VarSetCapacity(LVITEM, LVITEMsize, 0)
+      , NumPut(LVIF_PARAM, LVITEM, 0, "UInt")
+      , NumPut(Row - 1, LVITEM, 4, "Int")
+      , NumPut(Param, LVITEM, OffParam, "Ptr")
+      SendMessage, % LVM_SETITEM, 0, % &LVITEM, , % "ahk_id " . HWND
+      Return ErrorLevel
+   }
    ; +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    ; PUBLIC METHODS ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
    ; +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -106,6 +134,10 @@ Class LV_Colors {
    ; Attach()        Register ListView control for coloring
    ; Parameters:     HWND        -  ListView's HWND.
    ;                 Optional ------------------------------------------------------------------------------------------
+   ;                 StaticMode  -  Static color assignment, i.e. the colors will be assigned permanently to a row
+   ;                                rather than to a row number.
+   ;                                Values:  True / False
+   ;                                Default: False
    ;                 NoSort      -  Prevent sorting by click on a header item.
    ;                                Values:  True / False
    ;                                Default: True
@@ -114,7 +146,7 @@ Class LV_Colors {
    ;                                Default: True
    ; Return Values:  True on success, otherwise false.
    ; ===================================================================================================================
-   Attach(HWND, NoSort = True, NoSizing = True) {
+   Attach(HWND, StaticMode := False, NoSort := True, NoSizing := True) {
       Static LVM_GETBKCOLOR     := 0x1000
       Static LVM_GETHEADER      := 0x101F
       Static LVM_GETTEXTBKCOLOR := 0x1025
@@ -126,21 +158,21 @@ Class LV_Colors {
       If This.HasKey(HWND)
          Return False
       ; Set LVS_EX_DOUBLEBUFFER style to avoid drawing issues, if it isn't set as yet.
-      SendMessage, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_DOUBLEBUFFER, LVS_EX_DOUBLEBUFFER, , ahk_id %HWND%
+      SendMessage, % LVM_SETEXTENDEDLISTVIEWSTYLE, % LVS_EX_DOUBLEBUFFER, % LVS_EX_DOUBLEBUFFER, , % "ahk_id " . HWND
       If (ErrorLevel = "FAIL")
          Return False
       ; Get the default colors
-      SendMessage, LVM_GETBKCOLOR, 0, 0, , ahk_id %HWND%
+      SendMessage, % LVM_GETBKCOLOR, 0, 0, , % "ahk_id " . HWND
       BkClr := ErrorLevel
-      SendMessage, LVM_GETTEXTBKCOLOR, 0, 0, , ahk_id %HWND%
+      SendMessage, % LVM_GETTEXTBKCOLOR, 0, 0, , % "ahk_id " . HWND
       TBClr := ErrorLevel
-      SendMessage, LVM_GETTEXTCOLOR, 0, 0, , ahk_id %HWND%
+      SendMessage, % LVM_GETTEXTCOLOR, 0, 0, , % "ahk_id " . HWND
       TxClr := ErrorLevel
       ; Get the header control
-      SendMessage, LVM_GETHEADER, 0, 0, , ahk_id %HWND%
+      SendMessage, % LVM_GETHEADER, 0, 0, , % "ahk_id " . HWND
       Header := ErrorLevel
       ; Store the values in a new object
-      This[HWND] := {BK: BkClr, TB: TBClr, TX: TxClr, Header: Header}
+      This[HWND] := {BK: BkClr, TB: TBClr, TX: TxClr, Header: Header, IsStatic: !!StaticMode}
       If (NoSort)
          This.NoSort(HWND)
       If (NoSizing)
@@ -154,10 +186,17 @@ Class LV_Colors {
    ; ===================================================================================================================
    Detach(HWND) {
       ; Remove the subclass, if any
+      Static LVM_GETITEMCOUNT := 0x1004
       If (This[HWND].SC)
          DllCall("Comctl32.dll\RemoveWindowSubclass", "Ptr", HWND, "Ptr", This.SubclassProc, "Ptr", HWND)
+      If This[HWND].IsStatic {
+         SendMessage, % LVM_GETITEMCOUNT, 0, 0, , % "ahk_id " . HWND
+         ItemCount := ErrorLevel
+         Loop, % ItemCount
+            This.SetItemParam(HWND, A_Index - 1, 0)
+      }
       This.Remove(HWND, "")
-      WinSet, Redraw, , ahk_id %HWND%
+      WinSet, Redraw, , % "ahk_id " . HWND
       Return True
    }
    ; ===================================================================================================================
@@ -171,7 +210,7 @@ Class LV_Colors {
    ;                                Default: Empty -> default text color
    ; Return Value:   True on success, otherwise false.
    ; ===================================================================================================================
-   Row(HWND, Row, BkColor = "", TxColor = "") {
+   Row(HWND, Row, BkColor := "", TxColor := "") {
       If !This.HasKey(HWND)
          Return False
       If (BkColor = "") && (TxColor = "") {
@@ -193,6 +232,8 @@ Class LV_Colors {
          This[HWND].Rows[Row].Insert("B", BkBGR)
       If (TxBGR <> "")
          This[HWND].Rows[Row].Insert("T", TxBGR)
+      If This[HWND].IsStatic
+         This.SetItemParam(HWND, Row, Row)
       Return True
    }
    ; ===================================================================================================================
@@ -207,7 +248,7 @@ Class LV_Colors {
    ;                                Default: Empty -> default text color
    ; Return Value:   True on success, otherwise false.
    ; ===================================================================================================================
-   Cell(HWND, Row, Col, BkColor = "", TxColor = "") {
+   Cell(HWND, Row, Col, BkColor := "", TxColor := "") {
       If !This.HasKey(HWND)
          Return False
       If (BkColor = "") && (TxColor = "") {
@@ -230,21 +271,23 @@ Class LV_Colors {
          This[HWND].Cells[Row, Col].Insert("B", BkBGR)
       If (TxBGR <> "")
          This[HWND].Cells[Row, Col].Insert("T", TxBGR)
+      If This[HWND].IsStatic
+         This.SetItemParam(HWND, Row, Row)
       Return True
    }
    ; ===================================================================================================================
    ; NoSort()        Prevent / allow sorting by click on a header item dynamically.
    ; Parameters:     HWND        -  ListView's HWND
    ;                 Optional ------------------------------------------------------------------------------------------
-   ;                 DoIt        -  True / False
+   ;                 Apply       -  True / False
    ;                                Default: True
    ; Return Value:   True on success, otherwise false.
    ; ===================================================================================================================
-   NoSort(HWND, DoIt = True) {
+   NoSort(HWND, Apply := True) {
       Static HDM_GETITEMCOUNT := 0x1200
       If !This.HasKey(HWND)
          Return False
-      If (DoIt)
+      If (Apply)
          This[HWND].NS := True
       Else
          This[HWND].Remove("NS")
@@ -254,17 +297,17 @@ Class LV_Colors {
    ; NoSizing()      Prevent / allow resizing of columns dynamically.
    ; Parameters:     HWND        -  ListView's HWND
    ;                 Optional ------------------------------------------------------------------------------------------
-   ;                 DoIt        -  True / False
+   ;                 Apply       -  True / False
    ;                                Default: True
    ; Return Value:   True on success, otherwise false.
    ; ===================================================================================================================
-   NoSizing(HWND, DoIt = True) {
+   NoSizing(HWND, Apply := True) {
       Static OSVersion := DllCall("Kernel32.dll\GetVersion", "UChar")
       Static HDS_NOSIZING := 0x0800
       If !This.HasKey(HWND)
          Return False
       HHEADER := This[HWND].Header
-      If (DoIt) {
+      If (Apply) {
          If (OSVersion < 6) {
             If !(This[HWND].SC) {
                DllCall("Comctl32.dll\SetWindowSubclass", "Ptr", HWND, "Ptr", This.SubclassProc, "Ptr", HWND, "Ptr", 0)
@@ -291,12 +334,12 @@ Class LV_Colors {
    }
    ; ===================================================================================================================
    ; OnMessage()     Register / unregister LV_Colors message handler for WM_NOTIFY -> NM_CUSTOMDRAW messages
-   ; Parameters:     DoIt        -  True / False
+   ; Parameters:     Apply       -  True / False
    ;                                Default: True
    ; Return Value:   Always True
    ; ===================================================================================================================
-   OnMessage(DoIt = True) {
-      If (DoIt)
+   OnMessage(Apply := True) {
+      If (Apply)
          OnMessage(This.WM_NOTIFY, This.MessageHandler)
       Else If (This.MessageHandler = OnMessage(This.WM_NOTIFY))
          OnMessage(This.WM_NOTIFY, "")

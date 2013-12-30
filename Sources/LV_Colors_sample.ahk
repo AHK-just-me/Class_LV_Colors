@@ -1,27 +1,28 @@
 ﻿#NoEnv
-SetBatchLines, -1
 #Include Class_LV_Colors.ahk
+SetBatchLines, -1
 Gui, Margin, 20, 20
 Gui, Add, ListView, w600 r15 Grid -ReadOnly vVLV hwndHLV
    , Column 1|Column 2|Column 3|Column 4|Column 5|Column6
 Loop, 256
-   LV_Add("", "Value " . A_Index, "Value " . A_Index, "Value " . A_Index, "Value " . A_Index, "Value " . A_Index, "Value " . A_Index)
+   LV_Add("", "Value " . A_Index, "Value " . A_Index, "Value " . A_Index, "Value " . A_Index, "Value "
+        . A_Index, "Value " . A_Index)
 Loop, % LV_GetCount("Column")
    LV_ModifyCol(A_Index, "AutoHdr")
 Gui, Add, Button, wp gSubColors vBtnColors, Colors on!
 Gui, Show, , ListView & Colors
 LV_Colors.OnMessage()
 Return
-
+; ----------------------------------------------------------------------------------------------------------------------
 GuiClose:
 GuiEscape:
 ExitApp
-
+; ----------------------------------------------------------------------------------------------------------------------
 SubColors:
    GuiControlGet, BtnColors
    GuiControl, -Redraw, %HLV%
    If (BtnColors = "Colors on!") {
-      If !LV_Colors.Attach(HLV) {
+      If !LV_Colors.Attach(HLV, 1, 0, 0) {
          GuiControl, +Redraw, %HLV%
          Return
       }
