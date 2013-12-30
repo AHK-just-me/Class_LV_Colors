@@ -4,6 +4,7 @@
 ; Testted with:   AHK 1.1.13.01 (A32/U32/U64)
 ; Tested on:      Win 7 (x64)
 ; Changelog:
+;     0.4.01.00/2013-12-30/just me - minor bug fix
 ;     0.4.00.00/2013-12-30/just me - added static mode
 ;     0.3.00.00/2013-06-15/just me - added "Critical, 100" to avoid drawing issues
 ;     0.2.00.00/2013-01-12/just me - bugfixes and minor changes
@@ -193,7 +194,7 @@ Class LV_Colors {
          SendMessage, % LVM_GETITEMCOUNT, 0, 0, , % "ahk_id " . HWND
          ItemCount := ErrorLevel
          Loop, % ItemCount
-            This.SetItemParam(HWND, A_Index - 1, 0)
+            This.SetItemParam(HWND, A_Index, 0)
       }
       This.Remove(HWND, "")
       WinSet, Redraw, , % "ahk_id " . HWND
