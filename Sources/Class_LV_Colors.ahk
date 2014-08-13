@@ -1,9 +1,10 @@
 ﻿; ======================================================================================================================
 ; Namespace:      LV_Colors
 ; Function:       Helper object and functions for ListView row and cell coloring
-; Testted with:   AHK 1.1.13.01 (A32/U32/U64)
-; Tested on:      Win 7 (x64)
+; Testted with:   AHK 1.1.15.04 (A32/U32/U64)
+; Tested on:      Win 8.1 (x64)
 ; Changelog:
+;     0.5.00.00/2014-08-13/just me - changed 'static mode' handling
 ;     0.4.01.00/2013-12-30/just me - minor bug fix
 ;     0.4.00.00/2013-12-30/just me - added static mode
 ;     0.3.00.00/2013-06-15/just me - added "Critical, 100" to avoid drawing issues
@@ -67,7 +68,7 @@ Class LV_Colors {
       , Row := NumGet(L + ItemSpecP, 0, "UPtr") + 1
       , Col := NumGet(L + SubItemP, 0, "Int") + 1
       If This[H].IsStatic
-         Row := This.GetItemParam(H, Row)
+         Row := This.MapIndexToID(H, Row)
       ; SubItemPrepaint ------------------------------------------------------------------------------------------------
       If (DrawStage = CDDS_SUBITEMPREPAINT) {
          NumPut(This[H].CurTX, L + ClrTxP, 0, "UInt"), NumPut(This[H].CurTB, L + ClrTxBkP, 0, "UInt")
@@ -104,28 +105,9 @@ Class LV_Colors {
       Return CDRF_DODEFAULT
    }
    ; -------------------------------------------------------------------------------------------------------------------
-   GetItemParam(HWND, Row) {
-      Static LVM_GETITEM := 0x1005 ; it's save to use LVM_GETITEMA
-      Static LVIF_PARAM := 0x00000004
-      Static LVITEMsize := 72 ; size of 64-bit structure, it doesn't matter in this case
-      Static OffParam := 24 + (A_PtrSize * 2) ; offset of the lParam member
-      VarSetCapacity(LVITEM, LVITEMsize, 0)
-      , NumPut(LVIF_PARAM, LVITEM, 0, "UInt")
-      , NumPut(Row - 1, LVITEM, 4, "Int")
-      SendMessage, % LVM_GETITEM, 0, % &LVITEM, , % "ahk_id " . HWND
-      Return NumGet(LVITEM, OffParam, "UPtr")
-   }
-   ; -------------------------------------------------------------------------------------------------------------------
-   SetItemParam(HWND, Row, Param) {
-      Static LVM_SETITEM := 0x1006 ; it's save to use LVM_SETITEMA
-      Static LVIF_PARAM := 0x00000004
-      Static LVITEMsize := 72 ; size of 64-bit structure, it doesn't matter in this case
-      Static OffParam := 24 + (A_PtrSize * 2) ; offset of the lParam member
-      VarSetCapacity(LVITEM, LVITEMsize, 0)
-      , NumPut(LVIF_PARAM, LVITEM, 0, "UInt")
-      , NumPut(Row - 1, LVITEM, 4, "Int")
-      , NumPut(Param, LVITEM, OffParam, "Ptr")
-      SendMessage, % LVM_SETITEM, 0, % &LVITEM, , % "ahk_id " . HWND
+   MapIndexToID(HWND, Row) {
+      ; LVM_MAPINDEXTOID = 0x10B4 -> http://msdn.microsoft.com/en-us/library/bb761139(v=vs.85).aspx
+      SendMessage, 0x10B4, % (Row - 1), 0, , % "ahk_id " . HWND
       Return ErrorLevel
    }
    ; +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -190,12 +172,6 @@ Class LV_Colors {
       Static LVM_GETITEMCOUNT := 0x1004
       If (This[HWND].SC)
          DllCall("Comctl32.dll\RemoveWindowSubclass", "Ptr", HWND, "Ptr", This.SubclassProc, "Ptr", HWND)
-      If This[HWND].IsStatic {
-         SendMessage, % LVM_GETITEMCOUNT, 0, 0, , % "ahk_id " . HWND
-         ItemCount := ErrorLevel
-         Loop, % ItemCount
-            This.SetItemParam(HWND, A_Index, 0)
-      }
       This.Remove(HWND, "")
       WinSet, Redraw, , % "ahk_id " . HWND
       Return True
@@ -214,6 +190,8 @@ Class LV_Colors {
    Row(HWND, Row, BkColor := "", TxColor := "") {
       If !This.HasKey(HWND)
          Return False
+      If This[HWND].IsStatic
+         Row := This.MapIndexToID(HWND, Row)
       If (BkColor = "") && (TxColor = "") {
          This[HWND].Rows.Remove(Row, "")
          Return True
@@ -233,8 +211,6 @@ Class LV_Colors {
          This[HWND].Rows[Row].Insert("B", BkBGR)
       If (TxBGR <> "")
          This[HWND].Rows[Row].Insert("T", TxBGR)
-      If This[HWND].IsStatic
-         This.SetItemParam(HWND, Row, Row)
       Return True
    }
    ; ===================================================================================================================
@@ -252,6 +228,8 @@ Class LV_Colors {
    Cell(HWND, Row, Col, BkColor := "", TxColor := "") {
       If !This.HasKey(HWND)
          Return False
+      If This[HWND].IsStatic
+         Row := This.MapIndexToID(HWND, Row)
       If (BkColor = "") && (TxColor = "") {
          This[HWND].Cells.Remove(Row, "")
          Return True
@@ -272,8 +250,6 @@ Class LV_Colors {
          This[HWND].Cells[Row, Col].Insert("B", BkBGR)
       If (TxBGR <> "")
          This[HWND].Cells[Row, Col].Insert("T", TxBGR)
-      If This[HWND].IsStatic
-         This.SetItemParam(HWND, Row, Row)
       Return True
    }
    ; ===================================================================================================================
