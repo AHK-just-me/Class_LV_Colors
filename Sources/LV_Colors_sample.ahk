@@ -9,39 +9,48 @@ Loop, 256
         . A_Index, "Value " . A_Index)
 Loop, % LV_GetCount("Column")
    LV_ModifyCol(A_Index, "AutoHdr")
-Gui, Add, Button, wp gSubColors vBtnColors, Colors on!
+; Create a new instance of LV_Colors
+CLV := New LV_Colors(HLV)
+If !IsObject(CLV) {
+   MsgBox, 0, ERROR, Couldn't create a new LV_Colors object!
+   ExitApp
+}
+; Set the colors
+Loop, 256 {
+   If (A_Index & 1) {
+      If (Mod(A_Index, 3) = 0)
+         CLV.Row(A_Index, 0xFF0000, 0xFFFF00)
+      CLV.Cell(A_Index, 1, 0x00FF00, 0x000080)
+      CLV.Cell(A_Index, 3, 0x00FF00, 0x000080)
+      CLV.Cell(A_Index, 5, 0x00FF00, 0x000080)
+   }
+   Else
+      CLV.Row(A_Index, 0x000080, 0x00FF00)
+}
+Gui, Add, Button, wp gSubColors vBtnColors, Colors off!
 Gui, Show, , ListView & Colors
-LV_Colors.OnMessage()
+; Redraw the ListView after the first Gui, Show command to show the colors.
+WinSet, Redraw, , ahk_id %HLV%
 Return
 ; ----------------------------------------------------------------------------------------------------------------------
 GuiClose:
 GuiEscape:
 ExitApp
 ; ----------------------------------------------------------------------------------------------------------------------
+SetColors:
+GuiControl, -Redraw, %HLV%
+GuiControl, +Redraw, %HLV%
+Return
+; ----------------------------------------------------------------------------------------------------------------------
 SubColors:
    GuiControlGet, BtnColors
-   GuiControl, -Redraw, %HLV%
    If (BtnColors = "Colors on!") {
-      If !LV_Colors.Attach(HLV, 1, 0, 0) {
-         GuiControl, +Redraw, %HLV%
-         Return
-      }
-      Sleep, 10
-      Loop, 256 {
-         If (A_Index & 1) {
-            If (Mod(A_Index, 3) = 0)
-               LV_Colors.Row(HLV, A_Index, 0xFF0000, 0xFFFF00)
-            LV_Colors.Cell(HLV, A_Index, 1, 0x00FF00, 0x000080)
-            LV_Colors.Cell(HLV, A_Index, 3, 0x00FF00, 0x000080)
-            LV_Colors.Cell(HLV, A_Index, 5, 0x00FF00, 0x000080)
-         } Else {
-            LV_Colors.Row(HLV, A_Index, 0x000080, 0x00FF00)
-         }
+      CLV.OnMessage()
       GuiControl, , BtnColors, Colors off!
-      }
-   } Else {
-      LV_Colors.Detach(HLV)
+   }
+   Else {
+      CLV.OnMessage(False)
       GuiControl, , BtnColors, Colors on!
    }
-   GuiControl, +Redraw, %HLV%
+   GuiControl, Focus, %HLV%
 Return
