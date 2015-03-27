@@ -8,28 +8,19 @@ Loop, 256
    LV_Add("", "Value " . A_Index, "Value " . A_Index, "Value " . A_Index, "Value " . A_Index, "Value "
         . A_Index, "Value " . A_Index)
 Loop, % LV_GetCount("Column")
-   LV_ModifyCol(A_Index, "AutoHdr")
+   LV_ModifyCol(A_Index, 95)
 ; Create a new instance of LV_Colors
 CLV := New LV_Colors(HLV)
 If !IsObject(CLV) {
    MsgBox, 0, ERROR, Couldn't create a new LV_Colors object!
    ExitApp
 }
-; Set the colors
-Loop, 256 {
-   If (A_Index & 1) {
-      If (Mod(A_Index, 3) = 0)
-         CLV.Row(A_Index, 0xFF0000, 0xFFFF00)
-      CLV.Cell(A_Index, 1, 0x00FF00, 0x000080)
-      CLV.Cell(A_Index, 3, 0x00FF00, 0x000080)
-      CLV.Cell(A_Index, 5, 0x00FF00, 0x000080)
-   }
-   Else
-      CLV.Row(A_Index, 0x000080, 0x00FF00)
-}
-Gui, Add, Button, wp gSubColors vBtnColors, Colors off!
+Gui, Add, CheckBox, w120 vColorsOn gSubShowColors Checked, Colors On
+Gui, Add, Radio, x+120 yp wp vColors gSubColors, Colors
+Gui, Add, Radio, x+0 yp wp vAltRows gSubColors, Alternate Rows
+Gui, Add, Radio, x+0 yp wp vAltCols gSubColors, Alternate Columns
 Gui, Show, , ListView & Colors
-; Redraw the ListView after the first Gui, Show command to show the colors.
+; Redraw the ListView after the first Gui, Show command to show the colors, if any.
 WinSet, Redraw, , ahk_id %HLV%
 Return
 ; ----------------------------------------------------------------------------------------------------------------------
@@ -37,20 +28,39 @@ GuiClose:
 GuiEscape:
 ExitApp
 ; ----------------------------------------------------------------------------------------------------------------------
-SetColors:
-GuiControl, -Redraw, %HLV%
-GuiControl, +Redraw, %HLV%
+SubShowColors:
+Gui, Submit, NoHide
+If (ColorsOn)
+   CLV.OnMessage()
+Else
+   CLV.OnMessage(False)
+GuiControl, Focus, %HLV%
 Return
 ; ----------------------------------------------------------------------------------------------------------------------
 SubColors:
-   GuiControlGet, BtnColors
-   If (BtnColors = "Colors on!") {
-      CLV.OnMessage()
-      GuiControl, , BtnColors, Colors off!
+Gui, Submit, NoHide
+GuiControl, -Redraw, %HLV%
+CLV.Clear(1, 1)
+If (Colors)
+   GoSub, SetColors
+If (AltRows)
+   CLV.AlternateRows(0x808080, 0xFFFFFF)
+If (AltCols)
+   CLV.AlternateCols(0x808080, 0xFFFFFF)
+GuiControl, +Redraw, %HLV%
+Return
+; ----------------------------------------------------------------------------------------------------------------------
+SetColors:
+Loop, % LV_GetCount() {
+   If (A_Index & 1) {
+      CLV.Cell(A_Index, 1, 0x808080, 0xFFFFFF)
+      CLV.Cell(A_Index, 3, 0x808080, 0xFFFFFF)
+      CLV.Cell(A_Index, 5, 0x808080, 0xFFFFFF)
    }
    Else {
-      CLV.OnMessage(False)
-      GuiControl, , BtnColors, Colors on!
+      CLV.Cell(A_Index, 2, 0x808080, 0xFFFFFF)
+      CLV.Cell(A_Index, 4, 0x808080, 0xFFFFFF)
+      CLV.Cell(A_Index, 6, 0x808080, 0xFFFFFF)
    }
-   GuiControl, Focus, %HLV%
+}
 Return
