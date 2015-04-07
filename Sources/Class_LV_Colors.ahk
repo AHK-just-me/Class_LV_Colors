@@ -1,9 +1,10 @@
 ﻿; ======================================================================================================================
 ; Namespace:      LV_Colors
 ; Function:       Individual row and cell coloring for AHK ListView controls.
-; Testted with:   AHK 1.1.20.03 (A32/U32/U64)
+; Tested with:    AHK 1.1.21.02 (A32/U32/U64)
 ; Tested on:      Win 8.1 (x64)
 ; Changelog:
+;     1.1.02.00/2015-04-07/just me - bugfixes for StaticMode, NoSort, and NoSizing
 ;     1.1.01.00/2015-03-31/just me - removed option OnMessage from __New(), restructured code
 ;     1.1.00.00/2015-03-27/just me - added AlternateRows and AlternateCols, revised code.
 ;     1.0.00.00/2015-03-23/just me - new version using new AHK 1.1.20+ features
@@ -77,10 +78,8 @@ Class LV_Colors {
       This.IsStatic := !!StaticMode
       This.AltCols := False
       This.AltRows := False
-      If (NoSort)
-         This.NoSort()
-      If (NoSizing)
-         This.NoSizing()
+      This.NoSort(!!NoSort)
+      This.NoSizing(!!NoSizing)
       This.OnMessage()
       This.Critical := "Off"
       This.Attached[HWND] := True
@@ -224,9 +223,9 @@ Class LV_Colors {
       If !(This.HWND)
          Return False
       If (Apply)
-         This.NoSort := True
+         This.SortColumns := False
       Else
-         This.NoSort := False
+         This.SortColumns := True
       Return True
    }
    ; ===================================================================================================================
@@ -242,12 +241,12 @@ Class LV_Colors {
       If (Apply) {
          If (OSVersion > 5)
             Control, Style, +0x0800, , % "ahk_id " . This.Header ; HDS_NOSIZING = 0x0800
-         This.NoSizing := True
+         This.ResizeColumns := False
       }
       Else {
          If (OSVersion > 5)
             Control, Style, -0x0800, , % "ahk_id " . This.Header ; HDS_NOSIZING
-         This.NoSizing := False
+         This.ResizeColumns := True
       }
       Return True
    }
@@ -288,9 +287,9 @@ Class LV_Colors {
          Code := NumGet(L + (A_PtrSize * 2), 0, "Int")
          If (Code = -12)
             Return This.NM_CUSTOMDRAW(H, L)
-         If This.NoSort && (Code = -108)
+         If !This.SortColumns && (Code = -108)
             Return 0
-         If This.NoSizing && ((Code = -306) || (Code = -326))
+         If !This.ResizeColumns && ((Code = -306) || (Code = -326))
             Return True
       }
    }
@@ -309,7 +308,7 @@ Class LV_Colors {
       , Col := NumGet(L + OffSubItem, 0, "Int") + 1
       , Item := Row - 1
       If This.IsStatic
-         Row := This.MapIndexToID(H, Row)
+         Row := This.MapIndexToID(Row)
       ; CDDS_SUBITEMPREPAINT = 0x030001 --------------------------------------------------------------------------------
       If (DrawStage = 0x030001) {
          UseAltCol := !(Col & 1) && (This.AltCols)
