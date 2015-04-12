@@ -4,6 +4,7 @@
 ; Tested with:    AHK 1.1.21.02 (A32/U32/U64)
 ; Tested on:      Win 8.1 (x64)
 ; Changelog:
+;     1.1.03.00/2015-04-11/just me - bugfix for StaticMode
 ;     1.1.02.00/2015-04-07/just me - bugfixes for StaticMode, NoSort, and NoSizing
 ;     1.1.01.00/2015-03-31/just me - removed option OnMessage from __New(), restructured code
 ;     1.1.00.00/2015-03-27/just me - added AlternateRows and AlternateCols, revised code.
@@ -198,7 +199,7 @@ Class LV_Colors {
    Cell(Row, Col, BkColor := "", TxColor := "") {
       If !(This.HWND)
          Return False
-      If ThisIsStatic
+      If This.IsStatic
          Row := This.MapIndexToID(Row)
       This["Cells", Row].Remove(Col, "")
       If (BkColor = "") && (TxColor = "")
