@@ -4,6 +4,7 @@
 ; Tested with:    AHK 1.1.23.05 (A32/U32/U64)
 ; Tested on:      Win 10 (x64)
 ; Changelog:
+;     1.1.04.01/2016-05-03/just me - added change to remove the focus rectangle from focused rows
 ;     1.1.04.00/2016-05-03/just me - added SelectionColors method
 ;     1.1.03.00/2015-04-11/just me - bugfix for StaticMode
 ;     1.1.02.00/2015-04-07/just me - bugfixes for StaticMode, NoSort, and NoSizing
@@ -348,7 +349,8 @@ Class LV_Colors {
       If (DrawStage = 0x010001) {
          ; LVM_GETITEMSTATE = 0x102C, LVIS_SELECTED = 0x0002
          If (This.SelColors) && DllCall("SendMessage", "Ptr", H, "UInt", 0x102C, "Ptr", Item, "Ptr", 0x0002, "UInt") {
-            NumPut(NumGet(L + OffItemState, "UInt") & ~0x0001, L + OffItemState, "UInt")
+            ; Remove the CDIS_SELECTED (0x0001) and CDIS_FOCUS (0x0010) states from uItemState and set the colors.
+            NumPut(NumGet(L + OffItemState, "UInt") & ~0x0011, L + OffItemState, "UInt")
             If (This.SELB <> "")
                NumPut(This.SELB, L + OffCB, "UInt")
             If (This.SELT <> "")
