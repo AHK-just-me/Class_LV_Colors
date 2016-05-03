@@ -1,9 +1,10 @@
 ﻿; ======================================================================================================================
 ; Namespace:      LV_Colors
 ; Function:       Individual row and cell coloring for AHK ListView controls.
-; Tested with:    AHK 1.1.21.02 (A32/U32/U64)
-; Tested on:      Win 8.1 (x64)
+; Tested with:    AHK 1.1.23.05 (A32/U32/U64)
+; Tested on:      Win 10 (x64)
 ; Changelog:
+;     1.1.04.00/2016-05-03/just me - added SelectionColors method
 ;     1.1.03.00/2015-04-11/just me - bugfix for StaticMode
 ;     1.1.02.00/2015-04-07/just me - bugfixes for StaticMode, NoSort, and NoSizing
 ;     1.1.01.00/2015-03-31/just me - removed option OnMessage from __New(), restructured code
@@ -160,6 +161,29 @@ Class LV_Colors {
       Return True
    }
    ; ===================================================================================================================
+   ; SelectionColors() Sets background and/or text color for selected rows.
+   ; Parameters:     BkColor     -  Background color as RGB color integer (e.g. 0xFF0000 = red) or HTML color name.
+   ;                                Default: Empty -> default selected background color
+   ;                 TxColor     -  Text color as RGB color integer (e.g. 0xFF0000 = red) or HTML color name.
+   ;                                Default: Empty -> default selected text color
+   ; Return Value:   True on success, otherwise false.
+   ; ===================================================================================================================
+   SelectionColors(BkColor := "", TxColor := "") {
+      If !(This.HWND)
+         Return False
+      This.SelColors := False
+      If (BkColor = "") && (TxColor = "")
+         Return True
+      BkBGR := This.BGR(BkColor)
+      TxBGR := This.BGR(TxColor)
+      If (BkBGR = "") && (TxBGR = "")
+         Return False
+      This["SELB"] := BkBGR
+      This["SELT"] := TxBGR
+      This.SelColors := True
+      Return True
+   }
+   ; ===================================================================================================================
    ; Row()           Sets background and/or text color for the specified row.
    ; Parameters:     Row         -  Row number
    ;                 Optional ------------------------------------------------------------------------------------------
@@ -287,7 +311,7 @@ Class LV_Colors {
       If ((HCTL := NumGet(L + 0, 0, "UPtr")) = This.HWND) || (HCTL = This.Header) {
          Code := NumGet(L + (A_PtrSize * 2), 0, "Int")
          If (Code = -12)
-            Return This.NM_CUSTOMDRAW(H, L)
+            Return This.NM_CUSTOMDRAW(This.HWND, L)
          If !This.SortColumns && (Code = -108)
             Return 0
          If !This.ResizeColumns && ((Code = -306) || (Code = -326))
@@ -300,13 +324,14 @@ Class LV_Colors {
       Static SizeNMHDR := A_PtrSize * 3                  ; Size of NMHDR structure
       Static SizeNCD := SizeNMHDR + 16 + (A_PtrSize * 5) ; Size of NMCUSTOMDRAW structure
       Static OffItem := SizeNMHDR + 16 + (A_PtrSize * 2) ; Offset of dwItemSpec (NMCUSTOMDRAW)
+      Static OffItemState := OffItem + A_PtrSize         ; Offset of uItemState  (NMCUSTOMDRAW)
       Static OffCT :=  SizeNCD                           ; Offset of clrText (NMLVCUSTOMDRAW)
       Static OffCB := OffCT + 4                          ; Offset of clrTextBk (NMLVCUSTOMDRAW)
       Static OffSubItem := OffCB + 4                     ; Offset of iSubItem (NMLVCUSTOMDRAW)
       ; ----------------------------------------------------------------------------------------------------------------
       DrawStage := NumGet(L + SizeNMHDR, 0, "UInt")
-      , Row := NumGet(L + OffItem, 0, "UPtr") + 1
-      , Col := NumGet(L + OffSubItem, 0, "Int") + 1
+      , Row := NumGet(L + OffItem, "UPtr") + 1
+      , Col := NumGet(L + OffSubItem, "Int") + 1
       , Item := Row - 1
       If This.IsStatic
          Row := This.MapIndexToID(Row)
@@ -316,18 +341,27 @@ Class LV_Colors {
          , ColColors := This["Cells", Row, Col]
          , ColB := (ColColors.B <> "") ? ColColors.B : UseAltCol ? This.ACB : This.RowB
          , ColT := (ColColors.T <> "") ? ColColors.T : UseAltCol ? This.ACT : This.RowT
-         , NumPut(ColT, L + OffCT, 0, "UInt"), NumPut(ColB, L + OffCB, 0, "UInt")
+         , NumPut(ColT, L + OffCT, "UInt"), NumPut(ColB, L + OffCB, "UInt")
          Return (!This.AltCols && !This.HasKey(Row) && (Col > This["Cells", Row].MaxIndex())) ? 0x00 : 0x20
       }
       ; CDDS_ITEMPREPAINT = 0x010001 -----------------------------------------------------------------------------------
       If (DrawStage = 0x010001) {
+         ; LVM_GETITEMSTATE = 0x102C, LVIS_SELECTED = 0x0002
+         If (This.SelColors) && DllCall("SendMessage", "Ptr", H, "UInt", 0x102C, "Ptr", Item, "Ptr", 0x0002, "UInt") {
+            NumPut(NumGet(L + OffItemState, "UInt") & ~0x0001, L + OffItemState, "UInt")
+            If (This.SELB <> "")
+               NumPut(This.SELB, L + OffCB, "UInt")
+            If (This.SELT <> "")
+               NumPut(This.SELT, L + OffCT, "UInt")
+            Return 0x02 ; CDRF_NEWFONT
+         }
          UseAltRow := (Item & 1) && (This.AltRows)
          , RowColors := This["Rows", Row]
          , This.RowB := RowColors ? RowColors.B : UseAltRow ? This.ARB : This.BkClr
          , This.RowT := RowColors ? RowColors.T : UseAltRow ? This.ART : This.TxClr
          If (This.AltCols || This["Cells"].HasKey(Row))
             Return 0x20
-         NumPut(This.RowT, L + OffCT, 0, "UInt"), NumPut(This.RowB, L + OffCB, 0, "UInt")
+         NumPut(This.RowT, L + OffCT, "UInt"), NumPut(This.RowB, L + OffCB, "UInt")
          Return 0x00
       }
       ; CDDS_PREPAINT = 0x000001 ---------------------------------------------------------------------------------------

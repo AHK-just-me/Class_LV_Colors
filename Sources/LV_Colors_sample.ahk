@@ -11,6 +11,8 @@ Loop, % LV_GetCount("Column")
    LV_ModifyCol(A_Index, 95)
 ; Create a new instance of LV_Colors
 CLV := New LV_Colors(HLV)
+; Set the colors for selected rows
+CLV.SelectionColors(0xF0F0F0)
 If !IsObject(CLV) {
    MsgBox, 0, ERROR, Couldn't create a new LV_Colors object!
    ExitApp
